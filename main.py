@@ -1,11 +1,19 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
+import itertools
+
 import datetime
 import numpy as np
 # import io
 import statsmodels.formula.api as smf
+from scipy.stats import shapiro
+# from statsmodels.graphics.gofplots import qqplot
 
+
+# import plotly.express as px
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
+#
 
 
 @st.cache_data
@@ -30,6 +38,20 @@ def ols_reg(formula, df):
 
   return res, df_result, model
 
+# def acquire_qq_data(df_result_resid):
+#   qqplot_data = qqplot(df_result_resid, line='s').gca().lines
+
+#   df_qq = pd.DataFrame()
+#   df_qq["x_point"] = qqplot_data[0].get_xdata()
+#   df_qq["y_point"] = qqplot_data[0].get_ydata()
+
+#   df_qq["x_line"] = qqplot_data[1].get_xdata()
+#   df_qq["y_line"] = qqplot_data[1].get_ydata()
+
+#   return df_qq
+
+
+fig_size = [1280, 960]
 
 st.title('Linear Regression Tool')
 
@@ -57,10 +79,39 @@ if uploaded_csv is not None:
         "### Choose Factor(x)", factor_list)
     if not factor:
         st.error("Please select at least one factor.")
+
+    factor_2od_list = list()
+    for j in factor:
+       factor_2od_list.append(j+" ** 2")
+
+    # factor_2od = st.multiselect(
+    #     "### Choose Factor 2nd Order(x^2)", factor_2od_list)
+    # if not factor_2od:
+    #     st.error("Please select at least one factor.")
+
+    # factor_2od
+    factor_inter_tmp = list(itertools.combinations(factor, 2))
+    factor_inter_list =  list()
+    for i in factor_inter_tmp:
+       tmp = "*".join(i)
+       factor_inter_list.append(tmp)
+    factor_inter = st.multiselect(
+        "### Choose Factor Interaction(x)", factor_inter_list)
+    if not factor_inter:
+        st.error("Please select at least one factor.")
+    # st.write(factor)
+    # st.write(factor_inter_list)
     # factor
+    factor_final = factor + factor_inter
+    # factor_final = factor + factor_2od + factor_inter
+
+
+
+
     if st.button('Perform Analysis'):
-        x_formula = "+".join(factor)
+        x_formula = "+".join(factor_final)
         formula = response + "~" + x_formula
+        formula
         df_reg = df_raw.copy()
         # x_formula
         # formula
@@ -72,17 +123,64 @@ if uploaded_csv is not None:
         result, df_result, model = ols_reg(formula, df_reg)
         st.write(result.summary())
 
+
+
+        SW, sw_p_val = shapiro(df_result["resid"])
+        # df_qq = acquire_qq_data(df_result["resid"])
+
+        st.markdown("#### Normality Test P Value:%s " % round(sw_p_val,4))
+        if sw_p_val >= 0.05:
+          st.markdown("##### Residual is NOT normal distribution!!")
+        else:
+          st.markdown("##### Residual is normal distribution")
+
+        fig = make_subplots(
+            rows=2, cols=2,
+            subplot_titles=("yhat-residual-plot (random better)", "residual-histogram-plot (normal distribution better)", 
+                            "redidual-sequence-plot (random better)", "qq-plot (along line better)"))
+
+        fig.add_trace(go.Scatter(x=df_result["yhat"], y=df_result["resid"], mode="markers"),
+                      row=1, col=1)
+
+        fig.add_trace(go.Histogram(x=df_result["resid"],),
+                      row=1, col=2)
+
+        fig.add_trace(go.Scatter(y=df_result["resid"], mode="lines+markers"),
+                      row=2, col=1)
+
+        # fig.add_trace(go.Scatter(x=df_qq["x_point"], y=df_qq["y_point"], mode="markers"),
+        #               row=2, col=2)
+
+        # fig.add_trace(go.Scatter(x=df_qq["x_line"], y=df_qq["y_line"], mode="lines"),
+        #               row=2, col=2)
+
+        fig.update_xaxes(title_text="Y-hat", row=1, col=1)
+        fig.update_yaxes(title_text="Residual", row=1, col=1)
+
+        fig.update_xaxes(title_text="Residual", row=1, col=2)
+        fig.update_yaxes(title_text="Count", row=1, col=2)
+
+        fig.update_xaxes(title_text="Sequence", row=2, col=1)
+        fig.update_yaxes(title_text="Residual", row=2, col=1)
+
+        # fig.update_xaxes(title_text="Theoretical Quantiles", row=2, col=2)
+        # fig.update_yaxes(title_text="Sample Quantiles", row=2, col=2)
+
+        fig.update_layout(height=fig_size[1], width=fig_size[0],
+                          title_text="Model Check Figure",
+                          showlegend=False)
+        st.plotly_chart(fig, use_container_width=True)
+
         csv = convert_df(df_result)
         date = str(datetime.datetime.now()).split(" ")[0]
         # table_filename = doe_type + "_table_" + date
         result_file = date + "_lin-reg.csv"
-        st.download_button(label='Download DOE table as CSV', 
-                            data=csv, 
-                            file_name=result_file,
-                            mime='text/csv')
 
-
-    
+        st.download_button(label='Download statistics result as CSV', 
+                    data=csv, 
+                    file_name=result_file,
+                    mime='text/csv')
+            
 
 
 
