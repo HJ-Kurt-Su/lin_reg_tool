@@ -80,30 +80,34 @@ if uploaded_csv is not None:
     if not factor:
         st.error("Please select at least one factor.")
 
+    # factor_2nd order
     factor_2od_list = list()
     for j in factor:
-       factor_2od_list.append(j+" ** 2")
+       factor_2od_list.append("I("+j+" ** 2)")
 
-    # factor_2od = st.multiselect(
-    #     "### Choose Factor 2nd Order(x^2)", factor_2od_list)
-    # if not factor_2od:
-    #     st.error("Please select at least one factor.")
+    factor_2od = st.multiselect(
+        "### Choose Factor 2nd Order(x^2)", factor_2od_list)
+    if not factor_2od:
+        st.error("Please select at 2nd order factor.")
 
-    # factor_2od
+    # factor_2od_rev = 
+
+    # factor_interaction
     factor_inter_tmp = list(itertools.combinations(factor, 2))
     factor_inter_list =  list()
     for i in factor_inter_tmp:
        tmp = "*".join(i)
        factor_inter_list.append(tmp)
+
     factor_inter = st.multiselect(
-        "### Choose Factor Interaction(x)", factor_inter_list)
+        "### Choose Factor Interaction(x1 * x2)", factor_inter_list)
     if not factor_inter:
-        st.error("Please select at least one factor.")
+        st.error("Please select interaction factor.")
     # st.write(factor)
     # st.write(factor_inter_list)
     # factor
-    factor_final = factor + factor_inter
-    # factor_final = factor + factor_2od + factor_inter
+    # factor_final = factor + factor_inter  
+    factor_final = factor + factor_2od + factor_inter
 
 
 
