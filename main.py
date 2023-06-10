@@ -4,13 +4,14 @@ import itertools
 
 import datetime
 import numpy as np
-# import io
+import io
 import statsmodels.formula.api as smf
 from scipy.stats import shapiro
+from scipy import stats
 # from statsmodels.graphics.gofplots import qqplot
 
 
-# import plotly.express as px
+import plotly.express as px
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 #
@@ -55,11 +56,19 @@ fig_size = [1280, 960]
 
 st.title('Linear Regression Tool')
 
+st.markdown("#### Author & License:")
+
+st.markdown("**Kurt Su** (phononobserver@gmail.com)")
+
+st.markdown("**This tool release under [CC BY-NC-SA](https://creativecommons.org/licenses/by-nc-sa/4.0/) license**")
+
+st.markdown("               ")
+st.markdown("               ")
 
 # Provide dataframe example & relative url
 data_ex_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTnqEkuIqYHm1eDDF-wHHyQ-Jm_cvmJuyBT4otEFt0ZE0A6FEQyg1tqpWTU0PXIFA_jYRX8O-G6SzU8/pub?gid=0&single=true&output=csv"
 # st.write("Factor Format Example File [link](%s)" % factor_ex_url)
-st.markdown("#### Data Format Example File [Demo File](%s)" % data_ex_url)
+st.markdown("### **Data Format Example File [Demo File](%s)**" % data_ex_url)
 
 uploaded_csv = st.file_uploader('#### 選擇您要上傳的CSV檔')
 
@@ -112,7 +121,7 @@ if uploaded_csv is not None:
 
 
 
-    if st.button('Perform Analysis'):
+    if st.checkbox('Perform Analysis'):
         x_formula = "+".join(factor_final)
         formula = response + "~" + x_formula
         formula
@@ -127,6 +136,18 @@ if uploaded_csv is not None:
         result, df_result, model = ols_reg(formula, df_reg)
         st.write(result.summary())
 
+        alpha = 0.05
+        f_num = len(result.tvalues)-1
+        # dof = round(f_num/3, 0)
+        dof = result.df_resid
+        t_val = stats.t.ppf(1-alpha/2, dof)
+
+        df_pareto = result.tvalues[1:].abs()
+        df_pareto = df_pareto.sort_values(ascending=True)
+        df_pareto = pd.DataFrame(df_pareto).reset_index(level=0)
+        df_pareto.columns = ["factor", "t-value"]
+
+
 
 
         SW, sw_p_val = shapiro(df_result["resid"])
@@ -138,22 +159,33 @@ if uploaded_csv is not None:
         else:
           st.markdown("##### Residual is normal distribution")
 
+        color_sequence = ["#65BFA1", "#A4D6C1", "#D5EBE1", "#EBF5EC", "#00A0DF", "#81CDE4", "#BFD9E2"]
+        color_sequence = px.colors.qualitative.Pastel
+        template = "simple_white"
+
         fig = make_subplots(
             rows=2, cols=2,
             subplot_titles=("yhat-residual-plot (random better)", "residual-histogram-plot (normal distribution better)", 
-                            "redidual-sequence-plot (random better)", "qq-plot (along line better)"))
+                            "redidual-sequence-plot (random better)", "pareto-plot (red line as criteria)"))
 
-        fig.add_trace(go.Scatter(x=df_result["yhat"], y=df_result["resid"], mode="markers"),
+        fig.add_trace(go.Scatter(x=df_result["yhat"], y=df_result["resid"], mode="markers", 
+                                 marker=dict(color='rgba(19, 166, 255, 0.6)')),
                       row=1, col=1)
 
-        fig.add_trace(go.Histogram(x=df_result["resid"],),
+        fig.add_trace(go.Histogram(x=df_result["resid"],
+                                   marker=dict(color='rgba(19, 166, 255, 0.6)')),
                       row=1, col=2)
 
-        fig.add_trace(go.Scatter(y=df_result["resid"], mode="lines+markers"),
+        fig.add_trace(go.Scatter(y=df_result["resid"], mode="lines+markers",
+                                 marker=dict(color='rgba(19, 166, 255, 0.6)')),
                       row=2, col=1)
 
-        # fig.add_trace(go.Scatter(x=df_qq["x_point"], y=df_qq["y_point"], mode="markers"),
-        #               row=2, col=2)
+        fig.add_trace(go.Bar(x=df_pareto["t-value"], y=df_pareto["factor"], orientation='h', width=0.8,
+                             marker=dict(color='rgba(19, 166, 255, 0.6)')
+                             ),
+                      row=2, col=2)
+        fig.add_vline(x=t_val, line_width=2, line_dash='dash', line_color='red',
+                      row=2, col=2)
 
         # fig.add_trace(go.Scatter(x=df_qq["x_line"], y=df_qq["y_line"], mode="lines"),
         #               row=2, col=2)
@@ -167,16 +199,26 @@ if uploaded_csv is not None:
         fig.update_xaxes(title_text="Sequence", row=2, col=1)
         fig.update_yaxes(title_text="Residual", row=2, col=1)
 
-        # fig.update_xaxes(title_text="Theoretical Quantiles", row=2, col=2)
-        # fig.update_yaxes(title_text="Sample Quantiles", row=2, col=2)
+        fig.update_xaxes(title_text="Factor Importance", row=2, col=2)
+        fig.update_yaxes(title_text="Factor", row=2, col=2)
 
         fig.update_layout(height=fig_size[1], width=fig_size[0],
                           title_text="Model Check Figure",
                           showlegend=False)
+        
+
+        date = str(datetime.datetime.now()).split(" ")[0]
+
+        mybuff = io.StringIO()
+        fig_file_name = date + "_reg-judge.html"
+        # fig_html = fig_pair.write_html(fig_file_name)
+        fig.write_html(mybuff, include_plotlyjs='cdn')
+        html_bytes = mybuff.getvalue().encode()
+
         st.plotly_chart(fig, use_container_width=True)
 
         csv = convert_df(df_result)
-        date = str(datetime.datetime.now()).split(" ")[0]
+       
         # table_filename = doe_type + "_table_" + date
         result_file = date + "_lin-reg.csv"
 
@@ -185,7 +227,11 @@ if uploaded_csv is not None:
                     file_name=result_file,
                     mime='text/csv')
             
-
+        st.download_button(label="Download figure",
+                                    data=html_bytes,
+                                    file_name=fig_file_name,
+                                    mime='text/html'
+                                    )
 
 
 
@@ -311,11 +357,7 @@ if uploaded_csv is not None:
 #       fig_pair.update_traces(diagonal_visible=False, showupperhalf=False,)
 #       st.plotly_chart(fig_pair, use_container_width=True)
 
-#       mybuff = io.StringIO()
-#       fig_file_name = doe_type + "_pair-plot-test.html"
-#       # fig_html = fig_pair.write_html(fig_file_name)
-#       fig_pair.write_html(mybuff, include_plotlyjs='cdn')
-#       html_bytes = mybuff.getvalue().encode()
+
       
 
 #       csv = convert_df(df_resp)
