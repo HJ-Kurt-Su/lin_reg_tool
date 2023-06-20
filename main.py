@@ -14,7 +14,8 @@ from scipy import stats
 import plotly.express as px
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
-#
+
+import pickle
 
 
 @st.cache_data
@@ -50,6 +51,7 @@ def ols_reg(formula, df):
 #   df_qq["y_line"] = qqplot_data[1].get_ydata()
 
 #   return df_qq
+
 
 
 fig_size = [1280, 960]
@@ -229,17 +231,24 @@ if uploaded_csv is not None:
         
             # table_filename = doe_type + "_table_" + date
             result_file = date + "_lin-reg.csv"
+            model_file_name = date + "_model.pickle"
 
-            st.download_button(label='Download statistics result as CSV', 
-                        data=csv, 
-                        file_name=result_file,
-                        mime='text/csv')
+            st.download_button(label='Download statistics result as CSV',  
+                            data=csv, 
+                            file_name=result_file,
+                            mime='text/csv')
                 
             st.download_button(label="Download figure",
-                                        data=html_bytes,
-                                        file_name=fig_file_name,
-                                        mime='text/html'
-                                        )
+                                data=html_bytes,
+                                file_name=fig_file_name,
+                                mime='text/html'
+                                )
+            
+            st.download_button(label="Download Model",
+                                data=pickle.dumps(result),
+                                file_name=model_file_name,
+                                # mime='application/octet-stream'
+                                )
 
     if ana_type == "Taguchi Method":
         st.markdown("##### Under Construction!!")
